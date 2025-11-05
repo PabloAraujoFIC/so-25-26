@@ -1,0 +1,262 @@
+APUNTES PARA DEFENDER SO
+
+----- HEADERS -----
+
+<stdio.h>:  printf, fprintf, perror, snprintf, putchar
+
+<stdlib.h>: malloc, free, strtol, strtoll, atoi, exit
+
+<string.h>: strcpy, strncpy, strncat, strcmp, strlen, memcpy
+
+<errno.h>:  errno y constantes de error
+
+<stdbool.h>: bool, true, false
+
+<time.h>:   struct tm, time_t, strftime
+
+<sys/types.h>: tipos POSIX (mode_t, off_t, etc.)
+
+<sys/stat.h>: stat, lstat, fstat, struct stat, macros S_*
+
+<unistd.h>: read, write, close, lseek, unlink, rmdir, readlink, dup
+
+<fcntl.h>:  open, fcntl, flags de apertura O_*, F_GETFL, O_ACCMODE
+
+<dirent.h>: opendir, readdir, closedir, struct dirent
+
+<pwd.h>:    getpwuid, struct passwd
+
+<grp.h>:    getgrgid, struct group
+
+<limits.h>: PATH_MAX
+
+<stdint.h> / <inttypes.h>: intmax_t y formato %jd
+
+----- LLAMADAS AL SISTEMA -----
+
+shmget(key_t key, size_t size, int flags)
+    Crea/obtiene segmento System V (bloque de memoria compartida).
+    Aquí: en shm_get (con IPC_CREAT|IPC_EXCL si tam>0).
+
+shmat(int shmid, const void *addr, int shmflg)
+    Adjunta el segmento y devuelve dirección.
+    Aquí: en shm_get.
+
+shmdt(const void *addr)
+    Desadjunta un segmento ya mapeado.
+    Aquí: en detach_shared_entry, destroy_shared_block.
+
+shmctl(int shmid, int cmd, struct shmid_ds *buf)
+    Consulta (IPC_STAT) o borra (IPC_RMID).
+    Aquí: shm_get lee el tamaño real; delete_system_shared elimina del sistema.
+
+mmap(void *addr, size_t length, int prot, int flags, int fd, off_t off)
+    Mapea un fichero.
+    Aquí: map_file (con MAP_PRIVATE, PROT_* según permisos).
+
+munmap(void *addr, size_t length)
+    Desmapea.
+    Aquí: remove_mmap_entry, destroy_mmap_block.
+
+open(const char *path, int flags, mode_t mode)
+    Abrir fichero (lectura/escritura/creación).
+    Aquí: map_file, cmd_writefile.
+
+close(int fd)
+    Cerrar descriptor.
+    Aquí: varias funciones tras open.
+
+read(int fd, void *buf, size_t count)
+    Copia count bytes desde un fd del kernel a memoria de tu proceso buf.
+    Aquí: cmd_read, read_file_chunk (lee desde fichero a memoria del proceso).
+
+write(int fd, const void *buf, size_t count)
+    Escribe count bytes de buf en el fichero con descriptor fd.
+    Aquí: cmd_write, cmd_writefile.
+
+stat(const char *path, struct stat *st)
+    Obtener tamaño/estado del fichero.
+    Aquí: map_file, read_file_chunk.
+
+getpid(void)
+    PID del proceso para pmap/vmmap.
+    (vía popen/pclose) se invoca programa externo pmap (Linux) o vmmap (macOS)
+    — no es syscall, pero ejecuta proceso hijo y lee su salida.
+
+
+----- ESTRUCTURAS -----
+
+struct shmid_ds {
+    struct ipc_perm shm_perm;   // permisos y dueño
+    size_t          shm_segsz;  // tamaño del segmento (bytes)
+    time_t          shm_atime;  // última vez que se adjuntó (shmat)
+    time_t          shm_dtime;  // última vez que se desadjuntó (shmdt)
+    time_t          shm_ctime;  // última modificación de los metadatos
+    pid_t           shm_cpid;   // PID del creador
+    pid_t           shm_lpid;   // PID del último proceso que lo usó
+    shmatt_t        shm_nattch; // número de procesos actualmente adjuntos
+};
+
+struct ipc_perm {
+    key_t  __key;   // clave System V usada en shmget()
+    uid_t  uid;     // propietario
+    gid_t  gid;     // grupo propietario
+    uid_t  cuid;    // creador
+    gid_t  cgid;    // grupo creador
+    mode_t mode;    // bits de permisos (como en ficheros: 0666, 0644, etc.)
+    unsigned short seq;  // número de secuencia interno
+};
+
+struct stat {
+    dev_t     st_dev;     // ID del dispositivo que contiene el archivo
+    ino_t     st_ino;     // Número de inodo
+    mode_t    st_mode;    // Tipo de archivo y permisos
+    nlink_t   st_nlink;   // Número de enlaces duros
+    uid_t     st_uid;     // ID del usuario propietario
+    gid_t     st_gid;     // ID del grupo propietario
+    dev_t     st_rdev;    // Tipo de dispositivo (para nodos especiales)
+    off_t     st_size;    // Tamaño total del archivo en bytes
+    blksize_t st_blksize; // Tamaño de bloque óptimo para I/O
+    blkcnt_t  st_blocks;  // Número de bloques de disco asignados
+
+    // Marcas de tiempo:
+    struct timespec st_atim; // Último acceso (atime)
+    struct timespec st_mtim; // Última modificación (mtime)
+    struct timespec st_ctim; // Último cambio de metadatos (ctime)
+};
+
+struct timespec {
+    time_t tv_sec;   // segundos desde Epoch
+    long   tv_nsec;  // nanosegundos (0..999,999,999)
+};
+
+struct dirent {
+    ino_t          d_ino;       // Inodo de la entrada
+    off_t          d_off;       // Offset al siguiente dirent (no siempre útil)
+    unsigned short d_reclen;    // Longitud de esta entrada
+    unsigned char  d_type;      // Tipo (DT_REG, DT_DIR, DT_LNK, ...)
+    char           d_name[];    // Nombre NUL-terminado (tamaño variable)
+};
+
+struct passwd {
+    char  *pw_name;   // nombre login (ej. "Pablo")
+    char  *pw_passwd; // hash de password (a menudo "x" -> /etc/shadow)
+    uid_t  pw_uid;    // UID
+    gid_t  pw_gid;    // GID primario
+    char  *pw_gecos;  // info descriptiva (nombre real, etc.)
+    char  *pw_dir;    // directorio home (ej. "/home/Pablo")
+    char  *pw_shell;  // shell de login (ej. "/bin/bash")
+};
+
+struct group {
+    char   *gr_name;  // nombre del grupo
+    char   *gr_passwd;// (normalmente "x")
+    gid_t   gr_gid;   // GID
+    char  **gr_mem;   // lista de miembros (array de char* terminado en NULL)
+};
+
+struct tm {
+    int tm_sec;    // 0..60 (leap second)
+    int tm_min;    // 0..59
+    int tm_hour;   // 0..23
+    int tm_mday;   // 1..31 (día del mes)
+    int tm_mon;    // 0..11  (0=enero)
+    int tm_year;   // años desde 1900 (p.ej. 125 -> 2025)
+    int tm_wday;   // 0..6   (0=domingo)
+    int tm_yday;   // 0..365 (día del año)
+    int tm_isdst;  // >0 DST; =0 no DST; <0 desconocido
+
+    // Extensiones GNU/BSD (no POSIX puro):
+    long        tm_gmtoff;  // offset a UTC en segundos
+    const char *tm_zone;    // nombre de zona horaria
+};
+
+----- FLAGS Y MACROS -----
+
+Modo de acceso:
+O_RDONLY            Solo lectura
+O_WRONLY            Solo escritura
+O_RDWR              Lectura/escritura
+
+Modificadores:
+O_CREAT             Crea si no existe (requiere modo 0666 en 3er parámetro)
+O_EXCL              Con O_CREAT, falla si ya existe (creación exclusiva)
+O_TRUNC             Trunca a tamaño 0 si existe (y tienes permiso de escritura)
+O_APPEND            Escribe siempre al final (mueve offset al EOF antes de cada
+                    write)
+
+fcntl:
+F_GETFL             Devuelve los flags del descriptor
+flags & O_ACCMODE   Extrae el modo de acceso (ro/wo/rw).
+
+Tipos de archivo:
+__S_IFMT            Máscara de tipo
+__S_IFSOCK          Socket
+__S_IFLNK           Enlace simbólico
+__S_IFREG           Archivo Regular
+__S_IFBLK           Dispositivo de bloques
+__S_IFDIR           Directorio
+__S_IFCHR           Dispositivo de caracteres
+__S_IFIFO           FIFO/pipe
+
+S_ISSOCK(st_mode)	Socket
+S_ISLNK(st_mode)	Enlace simbólico
+S_ISREG(st_mode)	Archivo regular
+S_ISBLK(st_mode)	Dispositivo de bloques
+S_ISDIR(st_mode)	Directorio
+S_ISCHR(st_mode)	Dispositivo de caracteres
+S_ISFIFO(st_mode)	FIFO / pipe
+
+Permisos:
+| Propietario    | Grupo          | Otros          |
+| -------------- | -------------- | -------------- |
+| S_IRUSR (0400) | S_IRGRP (0040) | S_IROTH (0004) |
+| S_IWUSR (0200) | S_IWGRP (0020) | S_IWOTH (0002) |
+| S_IXUSR (0100) | S_IXGRP (0010) | S_IXOTH (0001) |
+
+Desplazamiento (lseek):
+SEEK_SET            Desde inicio
+SEEK_CUR            Desde posición actual
+SEEK_END            Desde final
+
+----- FUNCIONES DE LIBRERÍAS -----
+Ficheros:
+open(path, flags[, mode])   Abre/crea. Devuelve fd o -1.
+close(fd)                   Cierra. Por seguridad no se cierran fd 0, 1 y 2.
+dup(fd)                     Duplica descriptor, con misma posición/flags.
+lseek(fd, off, whence)      Mueve el offset y devuelve la nueva posición.
+fcntl(fd, F_GETFL)          Lee flags del fd (O_*).
+
+Directorios:
+opendir(path) / readdir(DIR*) / closedir(DIR*)  Iteración de entradas.
+mkdir(path, mode)   Crea directorio.
+rmdir(path)         Borra directorio vacío.
+
+Enlaces y borrado:
+lstat(path, &sb)    Stat sin seguir symlinks (clave para listar tipo ls -l).
+readlink(path, buf, buflen) Lee destino de symlink.
+unlink(path)        Borra nombre de archivo (enlace) del directorio.
+
+I/O crudo:
+read(fd, buf, count)    Lee hasta count bytes; devuelve ssize_t (>=0 o -1).
+write(fd, buf, count)   Escribe hasta count o menos; devuelve ssize_t.
+write_all               Reintenta hasta completar (EINTR), patrón correcto.
+
+Usuarios y grupos:
+getpwuid(uid)           Struct passwd* (puede ser NULL → “unknown”).
+getgrgid(gid)           Struct group*.
+
+Tiempo:
+localtime_r(&time_t, &tm)   Seguro para hilos; strftime para formatear.
+
+Conversión/parsing y utilidades:
+strtol, strtoll, atoi   Parseo de enteros (get_fd, offsets, etc.).
+snprintf                Construcción de rutas dir/file con control de tamaño.
+strcmp, strlen, strncpy, strncat, memcpy.
+perror, fprintf(stderr, ...)    Reportar errores (errno).
+
+----- OTROS -----
+
+uintptr_t x;   // entero sin signo capaz de almacenar una dirección
+intptr_t  y;   // entero con signo capaz de almacenar una dirección
+
