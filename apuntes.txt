@@ -2,23 +2,40 @@ APUNTES PARA DEFENDER SO
 
 ----- HEADERS -----
 
-<stdio.h>:  printf, fprintf, perror, snprintf, putchar
+<stdio.h>:  printf, fprintf, perror, snprintf, putchar, getline, popen/pclose,
+            fgets, fputs, fflush
 
-<stdlib.h>: malloc, free, strtol, strtoll, atoi, exit
+<stdlib.h>: malloc, free, strtol, strtoll, strtoul, atoi, exit, bsearch
 
-<string.h>: strcpy, strncpy, strncat, strcmp, strlen, memcpy
+<string.h>: strcpy, strncpy, strncat, strcmp, strlen, memcpy, memset, strtok,
+            strcspn, strdup
 
 <errno.h>:  errno y constantes de error
 
 <stdbool.h>: bool, true, false
 
-<time.h>:   struct tm, time_t, strftime
+<time.h>:   struct tm, time_t, strftime, localtime, localtime_r
 
-<sys/types.h>: tipos POSIX (mode_t, off_t, etc.)
+<sys/types.h>: tipos POSIX (mode_t, off_t, pid_t, ssize_t)
 
 <sys/stat.h>: stat, lstat, fstat, struct stat, macros S_*
 
-<unistd.h>: read, write, close, lseek, unlink, rmdir, readlink, dup
+<unistd.h>: read, write, close, lseek, unlink, rmdir, readlink, dup, getcwd,
+            chdir, getpid, getppid, STDIN_FILENO/OUT/ERR
+
+<ctype.h>:  tolower, isprint
+
+<sys/utsname.h>: uname, struct utsname (info del kernel/host)
+
+<sys/ipc.h>: key_t, IPC_CREAT/IPC_EXCL/IPC_STAT/IPC_RMID, IPC_PRIVATE
+
+<sys/shm.h>: shmget, shmat, shmdt, shmctl, struct shmid_ds
+
+<sys/mman.h>: mmap, munmap, PROT_*, MAP_*
+
+<sys/wait.h>: waitpid, macros WIFEXITED/WEXITSTATUS
+
+<stddef.h>: size_t, NULL, offsetof para estructuras
 
 <fcntl.h>:  open, fcntl, flags de apertura O_*, F_GETFL, O_ACCMODE
 
@@ -82,7 +99,49 @@ getpid(void)
     PID del proceso para pmap/vmmap.
     (vía popen/pclose) se invoca programa externo pmap (Linux) o vmmap (macOS)
     — no es syscall, pero ejecuta proceso hijo y lee su salida.
+ 
+getppid(void)
+    Devuelve el PID del proceso padre (cmd_getpid -p).
 
+uname(struct utsname *buf)
+    Recupera nombre de nodo, kernel y arquitectura del sistema.
+    Aquí: cmd_infosys.
+
+chdir(const char *path)
+    Cambia el directorio actual del proceso.
+    Aquí: cmd_cd.
+
+getcwd(char *buf, size_t size)
+    Devuelve en buf la ruta absoluta del directorio actual.
+    Aquí: cmd_cwd/cd cuando imprime el working dir.
+
+dup(int oldfd)
+    Duplica un descriptor y comparte offset/flags con el original.
+    Aquí: cmd_dup y al registrar stdin/stdout/stderr en LF.
+
+lseek(int fd, off_t offset, int whence)
+    Reposiciona el puntero del descriptor; devuelve la nueva posición.
+    Aquí: cmd_lseek y cmd_listOpen (consulta SEEK_CUR).
+
+mkdir(const char *path, mode_t mode)
+    Crea un directorio con los permisos solicitados.
+    Aquí: cmd_create (sin -f).
+
+rmdir(const char *path)
+    Borra un directorio vacío.
+    Aquí: cmd_erase y cmd_delrec.
+
+unlink(const char *path)
+    Elimina la entrada de directorio de un fichero regular.
+    Aquí: cmd_erase y delrec_path.
+
+readlink(const char *path, char *buf, size_t buflen)
+    Lee el destino de un enlace simbólico sin seguirlo.
+    Aquí: cmd_dir cuando showlink=true.
+
+lstat(const char *path, struct stat *st)
+    Igual que stat pero sin seguir enlaces simbólicos.
+    Aquí: cmd_dir, cmd_erase y cmd_delrec.
 
 ----- ESTRUCTURAS -----
 
@@ -171,6 +230,82 @@ struct tm {
     const char *tm_zone;    // nombre de zona horaria
 };
 
+struct utsname {
+    char sysname[_UTSNAME_SYSNAME_LENGTH];
+    char nodename[_UTSNAME_NODENAME_LENGTH];
+    char release[_UTSNAME_RELEASE_LENGTH];
+    char version[_UTSNAME_VERSION_LENGTH];
+    char machine[_UTSNAME_MACHINE_LENGTH];
+#ifdef _GNU_SOURCE
+    char domainname[_UTSNAME_DOMAIN_LENGTH];
+#endif
+};
+
+typedef struct Node {
+    int id;
+    void *data;
+    struct Node *next;
+    struct Node *prev;
+} Node;
+
+typedef struct { Node *head; } List;
+
+typedef struct Shell{
+    List *LH;   // historial
+    List *LF;   // ficheros abiertos
+    int   command_count;
+    bool  end;
+} Shell;
+
+typedef int (*command_fn)(int argc, char *argv[], struct Shell *sh);
+
+typedef struct {
+    const char *name;
+    command_fn  func;
+    const char *help;
+} command_entry;
+
+typedef struct tItemH{
+    int   id;     // número de entrada en historial
+    char *name;   // comando completo (strdup)
+} tItemH;
+
+typedef struct tItemF{
+    int  fileDescriptor; // fd abierto
+    char filename[MAX];  // ruta guardada
+    int  mode;           // flags O_* usados al abrir
+} tItemF;
+
+typedef enum { DIR_REC_NOREC = 0, DIR_REC_RECA, DIR_REC_RECB } dir_rec_t;
+
+typedef struct {
+    bool      longfmt;    // salida corta/larga
+    bool      showlink;   // mostrar destino de symlinks
+    bool      showhid;    // incluir ocultos ('.')
+    dir_rec_t rec;        // estrategia: norec|reca|recb
+} DirParams;
+
+typedef struct {
+    void  *addr;
+    size_t size;
+} MallocBlock;
+
+typedef struct {
+    key_t   key;
+    size_t  size;
+    void   *addr;
+    int     shmid;
+} SharedBlock;
+
+typedef struct {
+    char    path[PATH_MAX];
+    size_t  size;
+    void   *addr;
+    int     fd;
+    int     protection;
+    int     flags;
+} MmapBlock;
+
 ----- FLAGS Y MACROS -----
 
 Modo de acceso:
@@ -219,6 +354,48 @@ SEEK_SET            Desde inicio
 SEEK_CUR            Desde posición actual
 SEEK_END            Desde final
 
+Descriptores estándar:
+STDIN_FILENO (0)    Entrada estándar (se registra en LF como "stdin").
+STDOUT_FILENO (1)   Salida estándar ("stdout").
+STDERR_FILENO (2)   Error estándar ("stderr"); no se cierra automáticamente.
+
+Flags System V (sys/ipc.h / sys/shm.h):
+IPC_CREAT           Crea el segmento si no existe.
+IPC_EXCL            Con IPC_CREAT obliga a que falle si ya existe.
+IPC_STAT            shmctl obtiene metadatos (struct shmid_ds).
+IPC_RMID            shmctl elimina el segmento del sistema.
+IPC_PRIVATE         Clave reservada para crear segmentos no compartidos.
+
+Memoria mapeada (sys/mman.h):
+PROT_READ/WRITE/EXEC    Permisos por página (lectura, escritura, ejecución).
+MAP_PRIVATE             Mapeo privado (cambios no escriben en fichero).
+MAP_FAILED              Valor especial devuelto por mmap en error.
+
+Recorrido de directorios:
+DIR_REC_NOREC       No lista recursivamente.
+DIR_REC_RECA        Lista directorio antes de bajar a subdirectorios.
+DIR_REC_RECB        Lista hijo primero y directorio al final.
+
+Permisos extendidos:
+S_IRWXU/S_IRWXG/S_IRWXO    Combos rwx completos para usuario/grupo/otros.
+S_ISUID                    Bit setuid (ejecutables heredan UID del dueño).
+S_ISGID                    Bit setgid (hereda GID o marca directorios).
+S_ISVTX (__S_ISVTX)        "Sticky bit" (solo dueño puede borrar en dir tipo /tmp).
+
+Otras macros:
+_POSIX_C_SOURCE 200809L    Activa funciones POSIX como getline o popen.
+WIFEXITED(status)          Comprueba si pmap/vmmap terminó normalmente (wait.h).
+WEXITSTATUS(status)        Código de salida del proceso hijo.
+EINTR                      Error transitorio al escribir/leer; se reintenta (write_all).
+
+Tamaños y límites del programa:
+MAX_COMMAND (1024)         Buffer para la línea leída.
+MAX_TR (100)               Número máximo de tokens que se trocean.
+MAX_FILES (1024)           Límite de ficheros trackeados (p0.h).
+MAX (1024)                 Tamaño del nombre guardado en tItemF.
+TAMANO (1024)              Bytes reservados en la recursión (stack/static).
+PATH_MAX (4096)            Rutas completas para dir/readlink/mmap (fallback en memoria.h).
+
 ----- FUNCIONES DE LIBRERÍAS -----
 Ficheros:
 open(path, flags[, mode])   Abre/crea. Devuelve fd o -1.
@@ -231,6 +408,8 @@ Directorios:
 opendir(path) / readdir(DIR*) / closedir(DIR*)  Iteración de entradas.
 mkdir(path, mode)   Crea directorio.
 rmdir(path)         Borra directorio vacío.
+getcwd(buf, size)   Copia en buf el directorio actual (cmd_cwd/cd).
+chdir(path)         Cambia el directorio de trabajo del proceso (cmd_cd).
 
 Enlaces y borrado:
 lstat(path, &sb)    Stat sin seguir symlinks (clave para listar tipo ls -l).
@@ -242,21 +421,42 @@ read(fd, buf, count)    Lee hasta count bytes; devuelve ssize_t (>=0 o -1).
 write(fd, buf, count)   Escribe hasta count o menos; devuelve ssize_t.
 write_all               Reintenta hasta completar (EINTR), patrón correcto.
 
+Procesos externos y stdio:
+popen(cmd,"r")          Lanza pmap/vmmap y devuelve FILE* para leer su salida.
+pclose(FILE*)           Espera al proceso lanzado por popen y da su status.
+fgets(buf, n, FILE*)    Lee líneas del pipe antes de imprimirlas tal cual.
+fputs(str, stdout)      Reenvía cada línea recibida.
+fflush(stdout)          Vacía el buffer tras limpiar la pantalla (cmd_clear).
+
 Usuarios y grupos:
 getpwuid(uid)           Struct passwd* (puede ser NULL → “unknown”).
 getgrgid(gid)           Struct group*.
 
 Tiempo:
+time(NULL)             Epoch actual (segundos desde 1970) para cmd_date.
+localtime(&time_t)     Convierte a hora local (versión no thread-safe).
 localtime_r(&time_t, &tm)   Seguro para hilos; strftime para formatear.
 
 Conversión/parsing y utilidades:
-strtol, strtoll, atoi   Parseo de enteros (get_fd, offsets, etc.).
-snprintf                Construcción de rutas dir/file con control de tamaño.
-strcmp, strlen, strncpy, strncat, memcpy.
+strtol, strtoll, strtoul, atoi   Parseo de enteros (fd, tamaños, claves).
+getline(&buf, &len, stdin)       Lee la línea completa del usuario (readCommand).
+strtok(str, " \n\t")             Trocea la línea en argumentos (chopString).
+strcspn(str, "\n")               Encuentra el '\n' para eliminarlo.
+strdup(str)                      Copia el comando antes de meterlo en historial.
+sscanf(str, "%p", &ptr)          Convierte cadenas a punteros (parse_pointer).
+strcmp, strlen, strncpy, strncat, memcpy, memset.
+snprintf                        Construcción segura de rutas (dir/dirrec).
+bsearch(key, tabla, n, sizeof, cmp)  Encuentra el comando en la tabla ordenada.
 perror, fprintf(stderr, ...)    Reportar errores (errno).
+tolower/isprint                Dan representación legible en memdump.
 
 ----- OTROS -----
 
 uintptr_t x;   // entero sin signo capaz de almacenar una dirección
 intptr_t  y;   // entero con signo capaz de almacenar una dirección
-
+key_t     k;   // identificador System V que usa shared/mmap.
+pid_t     p;   // tipo devuelto por getpid/getppid.
+ssize_t   n;   // size_t con signo que devuelven read/write.
+dir_rec_t rec; // enum para controlar el comportamiento de 'dir'.
+List     *LF/LH; // listas doblemente enlazadas (ficheros abiertos, historial).
+pmap / vmmap   // programas externos que se ejecutan con popen en cmd_mem -pmap.
