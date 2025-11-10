@@ -380,13 +380,15 @@ Permisos extendidos:
 S_IRWXU/S_IRWXG/S_IRWXO    Combos rwx completos para usuario/grupo/otros.
 S_ISUID                    Bit setuid (ejecutables heredan UID del dueño).
 S_ISGID                    Bit setgid (hereda GID o marca directorios).
-S_ISVTX (__S_ISVTX)        "Sticky bit" (solo dueño puede borrar en dir tipo /tmp).
+S_ISVTX (__S_ISVTX)        "Sticky bit" (solo dueño puede borrar en dir
+                           tipo /tmp).
 
 Otras macros:
 _POSIX_C_SOURCE 200809L    Activa funciones POSIX como getline o popen.
 WIFEXITED(status)          Comprueba si pmap/vmmap terminó normalmente (wait.h).
 WEXITSTATUS(status)        Código de salida del proceso hijo.
-EINTR                      Error transitorio al escribir/leer; se reintenta (write_all).
+EINTR                      Error transitorio al escribir/leer; se reintenta
+                           (write_all).
 
 Tamaños y límites del programa:
 MAX_COMMAND (1024)         Buffer para la línea leída.
@@ -394,7 +396,8 @@ MAX_TR (100)               Número máximo de tokens que se trocean.
 MAX_FILES (1024)           Límite de ficheros trackeados (p0.h).
 MAX (1024)                 Tamaño del nombre guardado en tItemF.
 TAMANO (1024)              Bytes reservados en la recursión (stack/static).
-PATH_MAX (4096)            Rutas completas para dir/readlink/mmap (fallback en memoria.h).
+PATH_MAX (4096)            Rutas completas para dir/readlink/mmap (fallback en
+                           memoria.h).
 
 ----- FUNCIONES DE LIBRERÍAS -----
 Ficheros:
@@ -433,13 +436,13 @@ getpwuid(uid)           Struct passwd* (puede ser NULL → “unknown”).
 getgrgid(gid)           Struct group*.
 
 Tiempo:
-time(NULL)             Epoch actual (segundos desde 1970) para cmd_date.
-localtime(&time_t)     Convierte a hora local (versión no thread-safe).
+time(NULL)                  Epoch actual (segundos desde 1970) para cmd_date.
+localtime(&time_t)          Convierte a hora local (versión no thread-safe).
 localtime_r(&time_t, &tm)   Seguro para hilos; strftime para formatear.
 
 Conversión/parsing y utilidades:
 strtol, strtoll, strtoul, atoi   Parseo de enteros (fd, tamaños, claves).
-getline(&buf, &len, stdin)       Lee la línea completa del usuario (readCommand).
+getline(&buf, &len, stdin)       Lee la línea completa del usuario (readCommand)
 strtok(str, " \n\t")             Trocea la línea en argumentos (chopString).
 strcspn(str, "\n")               Encuentra el '\n' para eliminarlo.
 strdup(str)                      Copia el comando antes de meterlo en historial.
@@ -458,5 +461,5 @@ key_t     k;   // identificador System V que usa shared/mmap.
 pid_t     p;   // tipo devuelto por getpid/getppid.
 ssize_t   n;   // size_t con signo que devuelven read/write.
 dir_rec_t rec; // enum para controlar el comportamiento de 'dir'.
-List     *LF/LH; // listas doblemente enlazadas (ficheros abiertos, historial).
+List *LF/LH;   // listas doblemente enlazadas (ficheros abiertos, historial).
 pmap / vmmap   // programas externos que se ejecutan con popen en cmd_mem -pmap.
