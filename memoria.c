@@ -57,7 +57,7 @@ static int read_int(const char *str, int min, int max, int *value);
 static int read_fd(const char *str, int *fd);
 static int read_byte(const char *str, unsigned char *value);
 static bool range_within_block(const void *addr, size_t len,
-        const void *block_addr, size_t block_size);
+                                const void *block_addr, size_t block_size);
 static bool is_region_from_malloc(const void *addr, size_t len);
 static bool is_region_from_shared(const void *addr, size_t len);
 static bool is_region_from_mmap(const void *addr, size_t len);

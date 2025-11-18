@@ -355,7 +355,7 @@ SEEK_CUR            Desde posición actual
 SEEK_END            Desde final
 
 Descriptores estándar:
-STDIN_FILENO (0)    Entrada estándar (se registra en LF como "stdin").
+STDIN_FILENO  (0)   Entrada estándar (se registra en LF como "stdin").
 STDOUT_FILENO (1)   Salida estándar ("stdout").
 STDERR_FILENO (2)   Error estándar ("stderr"); no se cierra automáticamente.
 
@@ -448,10 +448,10 @@ strcspn(str, "\n")               Encuentra el '\n' para eliminarlo.
 strdup(str)                      Copia el comando antes de meterlo en historial.
 sscanf(str, "%p", &ptr)          Convierte cadenas a punteros (parse_pointer).
 strcmp, strlen, strncpy, strncat, memcpy, memset.
-snprintf                        Construcción segura de rutas (dir/dirrec).
+snprintf                         Construcción segura de rutas (dir/dirrec).
 bsearch(key, tabla, n, sizeof, cmp)  Encuentra el comando en la tabla ordenada.
-perror, fprintf(stderr, ...)    Reportar errores (errno).
-tolower/isprint                Dan representación legible en memdump.
+perror, fprintf(stderr, ...)     Reportar errores (errno).
+tolower/isprint                  Dan representación legible en memdump.
 
 ----- OTROS -----
 
