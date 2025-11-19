@@ -1,8 +1,8 @@
 // Pablo Araújo Rodríguez   pablo.araujo@udc.es
 // Uriel Liñares Vaamonde   uriel.linaresv@udc.es
 
-#ifndef PRACTICAS_FICHEROS_H
-#define PRACTICAS_FICHEROS_H
+#ifndef FICHEROS_H
+#define FICHEROS_H
 
 #define MAX 1024
 #define _POSIX_C_SOURCE 200809L
@@ -67,4 +67,4 @@ int cmd_dir(int argc, char *argv[], struct Shell *sh);
 int cmd_delrec(int argc, char *argv[], struct Shell *sh);
 int cmd_lseek(int argc, char *argv[], struct Shell *sh);
 int cmd_writestr(int argc, char *argv[], struct Shell *sh);
-#endif //PRACTICAS_FICHEROS_H
+#endif //FICHEROS_H

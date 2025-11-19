@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "lista.h"
-#include "p0.h"
+#include "p2.h"
 #include "memoria.h"
 
 /* forward declaration: no incluye p0.h aquí */

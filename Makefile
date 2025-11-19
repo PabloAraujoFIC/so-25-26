@@ -1,6 +1,6 @@
 # === Configuración ===
-TARGET    := p0
-SRC       := p0.c comandos.c lista.c ficheros.c memoria.c
+TARGET    := p2
+SRC       := p2.c comandos.c lista.c ficheros.c memoria.c
 OBJ       := $(SRC:.c=.o)
 DEP       := $(OBJ:.o=.d)
 

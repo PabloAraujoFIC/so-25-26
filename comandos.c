@@ -3,7 +3,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include "comandos.h"
-#include "p0.h"
+#include "p2.h"
 #include "ficheros.h"
 
 // Tabla de comandos

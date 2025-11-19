@@ -2,7 +2,7 @@
 // Uriel Liñares Vaamonde   uriel.linaresv@udc.es
 
 #include "ficheros.h"
-#include "p0.h"
+#include "p2.h"
 
 static DirParams global_dir_params = { false, false, false, DIR_REC_NOREC };
 
