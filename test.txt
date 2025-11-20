@@ -1,0 +1,171 @@
+# NOTA: Las líneas que comienzan por '#' son comentarios para guiar la prueba.
+# Sustituye los literales entre <> por los valores reales que muestre la shell.
+help
+help authors dir historic
+help noExiste
+
+authors
+authors -l
+authors -n
+authors -x
+
+date
+date -d
+date -t
+hour
+date --bad
+
+infosys
+getpid
+getpid -p
+getpid -x
+pid
+pid -p
+pid -x
+
+cls
+cls extra
+
+pwd
+getcwd
+cwd
+cwd extra
+
+chdir
+chdir .
+chdir noExiste
+
+create testdir
+chdir testdir
+create -f sample.txt
+dir -d .
+chdir ..
+dir -d testdir
+erase testdir
+erase testdir/sample.txt
+erase testdir
+create -f sample.txt
+create -f sample.txt
+
+setdirparams long link hid recb
+getdirparams
+dir sample.txt
+dir inexistente.txt
+setdirparams short nolink nohid norec
+setdirparams invalido
+getdirparams
+dir -d .
+
+open sample.txt ro
+open sample.txt rw
+open inexistente.txt ro
+listopen
+# Anota los descriptores mostrados en la salida anterior.
+dup <FD_RO>
+dup 3
+dup 999
+lseek <FD_RO> 0 SEEK_END
+lseek <FD_RO> 10 SEEK_SET
+lseek <FD_RO> 0 SEEK_BOGUS
+writestr <FD_RO> Probar escritura
+writestr <FD_RW> Hola shell
+listopen
+close <FD_DUP>
+close sample.txt
+close 999
+listopen
+open sample.txt rw
+listopen
+# Vuelve a anotar el descriptor con modo escritura para las pruebas siguientes.
+
+malloc
+malloc 64
+# Sustituye <PTR64> por la dirección devuelta por el malloc anterior.
+memfill <PTR64> 32 0x41
+memdump <PTR64> 32
+memdump 0x1 16
+memfill <PTR64> 4096 0x41
+writefile sample_dump.bin <PTR64> 16
+writefile sample_dump.bin
+write <FD_RW> <PTR64> 16
+lseek <FD_RW> 0 SEEK_SET
+read <FD_RW> <PTR64> 16
+memfill <PTR64> 0 0x00
+malloc 0
+malloc cuatro
+mem -funcs
+mem -vars
+mem -blocks
+mem -all
+mem -pmap
+mem -wrong
+free <PTR64>
+free <PTR64>
+
+malloc 128
+# Guarda la dirección como <PTR128>.
+malloc 128 -free
+free 0x1
+
+malloc 32
+# Guarda la dirección como <PTR32>.
+memfill <PTR32> 32 0x42
+readfile sample_dump.bin <PTR32> 16
+readfile noexiste.bin <PTR32>
+writefile sample_dump.bin <PTR32> 32
+writefile -o sample_dump.bin <PTR32> 8
+free <PTR32>
+
+shared
+shared -create 24680 256
+# Sustituye <PTRSH1> y <PTRSH2> por las direcciones que muestre la shell.
+memfill <PTRSH1> 16 0x55
+shared
+shared 24680
+shared -free 24680
+shared -delkey 24680
+shared -free 24680
+shared -create 24680 0
+shared -foo 24680
+
+mmap
+mmap sample.txt rw
+# Sustituye <PTRMMAP> por la dirección mapeada.
+mmap
+memdump <PTRMMAP> 32
+mmap -free sample.txt
+mmap sample.txt z
+
+create recdir
+chdir recdir
+create sub1
+chdir sub1
+create -f nested.txt
+chdir ..
+create -f root.txt
+chdir ..
+dir -d recdir
+delrec
+delrec recdir
+dir recdir
+
+historic
+historic -count
+historic -3
+# Tras listar el histórico, anota un identificador válido y reutilízalo:
+historic <ID_VALIDO>
+historic -clear
+historic
+
+recurse 3
+recurse -1
+
+listopen
+close sample.txt
+listopen
+
+# Probar comandos de salida en una sesión aparte:
+exit
+quit
+bye
+exit ahora
