@@ -1,6 +1,6 @@
 # === Configuración ===
 TARGET    := p2
-SRC       := p2.c comandos.c lista.c ficheros.c memoria.c
+SRC       := p2.c comandos.c lista.c ficheros.c memoria.c procesos.c
 OBJ       := $(SRC:.c=.o)
 DEP       := $(OBJ:.o=.d)
 
@@ -52,4 +52,3 @@ debug:
 # Limpieza
 clean:
 	$(RM) $(OBJ) $(DEP) $(TARGET)
-
