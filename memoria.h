@@ -52,18 +52,18 @@ void *shm_get(key_t clave, size_t tam);
 void *map_file(char *fichero, int protection);
 void fill_memory(void *p, size_t cont, unsigned char byte);
 
-int cmd_malloc(int argc, char *argv[], struct Shell *sh);
-int cmd_free(int argc, char *argv[], struct Shell *sh);
-int cmd_memfill(int argc, char *argv[], struct Shell *sh);
-int cmd_memdump(int argc, char *argv[], struct Shell *sh);
-int cmd_mmap(int argc, char *argv[], struct Shell *sh);
-int cmd_shared(int argc, char *argv[], struct Shell *sh);
-int cmd_recurse(int argc, char *argv[], struct Shell *sh);
-int cmd_read(int argc, char *argv[], struct Shell *sh);
-int cmd_readfile(int argc, char *argv[], struct Shell *sh);
-int cmd_write(int argc, char *argv[], struct Shell *sh);
-int cmd_writefile(int argc, char *argv[], struct Shell *sh);
-int cmd_mem(int argc, char *argv[], struct Shell *sh);
+int cmd_malloc(int argc, char *argv[]);
+int cmd_free(int argc, char *argv[]);
+int cmd_memfill(int argc, char *argv[]);
+int cmd_memdump(int argc, char *argv[]);
+int cmd_mmap(int argc, char *argv[]);
+int cmd_shared(int argc, char *argv[]);
+int cmd_recurse(int argc, char *argv[]);
+int cmd_read(int argc, char *argv[]);
+int cmd_readfile(int argc, char *argv[]);
+int cmd_write(int argc, char *argv[]);
+int cmd_writefile(int argc, char *argv[]);
+int cmd_mem(int argc, char *argv[]);
 void mem_cleanup(void);
 
 #endif

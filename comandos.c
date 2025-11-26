@@ -2,9 +2,30 @@
 // Uriel Liñares Vaamonde   uriel.linaresv@udc.es
 
 #define _POSIX_C_SOURCE 200809L
+#include <errno.h>
 #include "comandos.h"
-#include "p2.h"
-#include "ficheros.h"
+
+static List *history = NULL;
+static int history_command_count = 0;
+
+static void listarHistorialDeComandos(const List *list);
+
+static void ensure_history_storage(void) {
+    if (!history) history = createList();
+}
+
+void commands_init(void) {
+    ensure_history_storage();
+    clearList(history, delHist);
+    history_command_count = 0;
+}
+
+void commands_shutdown(void) {
+    if (!history) return;
+    deleteList(history, delHist);
+    history = NULL;
+    history_command_count = 0;
+}
 
 // Tabla de comandos
 static command_entry commands[] = {
@@ -12,6 +33,7 @@ static command_entry commands[] = {
         "\tauthors -l\tPrints only the logins.\n\tauthors -n\tPrints only the "
         "names"},
     {"bye", cmd_exit, "Ends the shell"},
+    {"cd", cmd_cd, "Changes the current working directory of the shell to dir. When invoked without arguments it prints the current working directory."},
     {"chdir", cmd_cd, "Changes the current working directory of the shell to dir. "
         "When invoked without auguments it prints the current working directory"
         "."},
@@ -20,19 +42,25 @@ static command_entry commands[] = {
     {"cls", cmd_clear, "Clears the shell screen."},
     {"create", cmd_create, "\n\tcreate -f 'name':\tCreates a file\n\tcreate 'name':"
         "\t\tCreates a directory"},
+    {"cwd", cmd_cwd, "Prints the current working directory of the shell or changes it when used via 'cwd dir'"},
     {"date", cmd_date, "Prints the current date in the format DD/MM/YYYY and the "
         "current time in the format hh:mm:ss.\n\t\tdate -d\tPrints the current "
         "date in the format DD/MM/YYYY\n\t\tdate -t\tPrints and the current "
         "time in the format hh:mm:ss."},
+    {"deljobs", cmd_deljobs, "deljobs -term|-sig: removes finished or signaled background jobs from the list"},
     {"delrec", cmd_delrec, "Deletes a file or directory recursively"},
     {"dir", cmd_dir, "dir [-long|-short] [-link|-nolink] [-d] [hid|nohid] "
         "[reca|recb|norec] [n1 n2 ...] Shows info for files/dirs;\n\t-d\t\t"
         "lists directory contents;\n\thid/nohid\tincludes hidden; \n\t"
         "reca/recb/norec\tcontrols recursion."},
     {"dup", cmd_dup, "Duplicates the df file descriptor"},
+    {"envvar", cmd_envvar, "envvar -show VAR | envvar -change [-a|-e|-p] VAR VALUE: "
+        "displays or updates environment variables"},
     {"erase", cmd_erase, "erase 'name':\tErases the empty files or directories "
         "specified by 'name'"},
+    {"exec", cmd_exec, "exec progspec: replaces the shell with the specified program (foreground only)"},
     {"exit", cmd_exit, "Ends the shell"},
+    {"fork", cmd_fork, "fork: creates a child process and waits for it to finish"},
     {"free", cmd_free, "free addr: releases the block associated with addr"},
     {"getcwd", cmd_cwd, "Prints the current working directory of the shell"},
     {"getdirparams", cmd_getdirparams, "Shows the value of the parameters for "
@@ -49,6 +77,7 @@ static command_entry commands[] = {
         "the history list\n\t– historic -clear\tClears the history list"},
     {"hour", cmd_date, "Prints and the current time in the format hh:mm:ss." },
     {"infosys", cmd_infosys, "Prints information on the machine running the shell"},
+    {"jobs", cmd_jobs, "jobs: lists tracked background processes"},
     {"listopen", cmd_listOpen,"Lists the shell open files"},
     {"lseek", cmd_lseek, "lseek df offset whence: Repositions the offset of the"
         " file descriptor df to the argument offset according to the directive "
@@ -71,6 +100,8 @@ static command_entry commands[] = {
         "hid|nohid | reca|recb|norec: sets listing parameters for 'dir' "
         "(format, symlink target, hidden files, and recursion order/disable)."},
     {"shared", cmd_shared, "shared key: attaches; shared -create key size: creates and attaches; shared -free key: detaches; shared -delkey key: removes"},
+    {"showenv", cmd_showenv, "showenv [-environ|-addr]: lists the stored environment or the environ pointer addresses"},
+    {"uid", cmd_uid, "uid -get | uid -set [-l] id: shows credentials or changes the shell's real/effective IDs"},
     {"write", cmd_write, "write fd addr count: writes count bytes from addr to descriptor fd"},
     {"writefile", cmd_writefile, "writefile [-o] file addr count: writes bytes from memory into file"},
     {"writestr", cmd_writestr, "writestr fd str: writes the string str to the "
@@ -79,17 +110,31 @@ static command_entry commands[] = {
 
 static const size_t n_commands = sizeof(commands) / sizeof(commands[0]);
 
-char *readCommand(List *LH, char *command, bool read, Shell *sh)
+static int command_cmp(const void *keyp, const void *elem) {
+    const char *key = *(const char * const *)keyp;
+    const command_entry *entry = (const command_entry *)elem;
+    return strcmp(key, entry->name);
+}
+
+char *readCommand(char *command, bool read)
 {
     size_t len = 0;
+
+    ensure_history_storage();
 
     // Leemos el comando
     if (read) {
         if (getline(&command, &len, stdin) == -1) {
+            if (errno == EINTR) {
+                clearerr(stdin);
+                if (command) command[0] = '\0';
+                return command;
+            }
             perror("Error reading command");
             return NULL;
         }
         command[strcspn(command, "\n")] = '\0';
+        if (command[0] == '\0') return command;
     }
 
     // Reserva en heap el item del historial
@@ -97,12 +142,12 @@ char *readCommand(List *LH, char *command, bool read, Shell *sh)
     if (!item) { perror("malloc"); return NULL; }
 
     // Incrementa el contador de comandos
-    item->id   = sh->command_count++;
+    item->id   = history_command_count++;
     item->name = strdup(command);
     if (!item->name) { perror("strdup"); free(item); return NULL; }
 
     // Insertamos el comando en el historial
-    if (insertItem(LH, item) != 0) {
+    if (insertItem(history, item) != 0) {
         free(item->name);
         free(item);
         perror("Error inserting command into history");
@@ -121,29 +166,21 @@ int chopString(char * argc, char * argv[])
     return i;
 }
 
-static int command_cmp(const void *keyp, const void *elem) {
-    const char *key = *(const char * const *)keyp;
-    const command_entry *entry = (const command_entry *)elem;
-    return strcmp(key, entry->name);
-}
-
-
-int processCommand(int argc, char *argv[], Shell *sh)
+int processCommand(int argc, char *argv[])
 {
-    (void)argc; (void)argv; (void)sh;
+    procesos_refresh();
     if (argc < 1) return 0;
     command_entry *e = bsearch(&argv[0], commands, n_commands,
                                 sizeof(commands[0]), command_cmp);
     if (e != NULL) {
-        return e->func(argc, argv, sh); // Ejecuta el handler
+        return e->func(argc, argv); // Ejecuta el handler
     }
-    fprintf(stderr, "Unknown command: '%s'. Use 'help'.\n", argv[0]);
-    return 0;
+    return execute_external_command(argc, argv);
 }
 
-int cmd_historic(int argc, char *argv[], Shell *sh) {
-    (void)argc; (void)argv; (void)sh;
-    if (sh->LH == NULL) {
+int cmd_historic(int argc, char *argv[]) {
+    ensure_history_storage();
+    if (!history || history->head == NULL) {
         printf("Empty List\n");
         return 1;
     }
@@ -151,17 +188,17 @@ int cmd_historic(int argc, char *argv[], Shell *sh) {
     // Si no se especifica parámetro, listamos el historial completo
     if (argc == 1)
     {
-        listarHistorialDeComandos(sh->LH);
+        listarHistorialDeComandos(history);
         return 1;
     }
     if (strcmp(argv[1], "-clear")==0)
     {
-        historic_clear(sh);
+        historic_clear();
         return 0;
     }
     if (strcmp(argv[1], "-count")==0)
     {
-        printf("%d", sh->command_count);
+        printf("%d", history_command_count);
         return 0;
     }
 
@@ -178,7 +215,7 @@ int cmd_historic(int argc, char *argv[], Shell *sh) {
     // Si se proporciona un número negativo, mostramos los últimos n comandos
     if (i < 0) {
         int count = 0;
-        for (Node *x = sh->LH->head; x != NULL && count < -i; x = x->next) {
+        for (Node *x = history->head; x != NULL && count < -i; x = x->next) {
             tItemH *y = (tItemH*)x->data;
             printf("%d\t%s\n", y->id, y->name);
             count++;
@@ -188,12 +225,12 @@ int cmd_historic(int argc, char *argv[], Shell *sh) {
 
     // Si el número es positivo, buscamos el comando por su ID y lo ejecutamos
     int count = 0;
-    Node *x = sh->LH->head;
-    while (x != NULL && count < sh->command_count-i-1) {  // avanzar i pasos
+    Node *x = history->head;
+    while (x != NULL && count < history_command_count-i-1) {  // avanzar i pasos
         x = x->next;
         count++;
     }
-    if (x == NULL || i > sh->command_count) {
+    if (x == NULL || i > history_command_count) {
         printf("Position %ld does not exist in historic\n", i);
         return 1;
     }
@@ -207,11 +244,11 @@ int cmd_historic(int argc, char *argv[], Shell *sh) {
     printf("%d -> %s\n", y->id, y->name);
     char *argv2[MAX_TR] = {0};
     const int argc2 = chopString(y->name, argv2);
-    processCommand(argc2, argv2, sh);
+    processCommand(argc2, argv2);
     return 0;
 }
 
-void listarHistorialDeComandos(const List *list) {
+static void listarHistorialDeComandos(const List *list) {
     if (!list) {
         puts("Empty list or null pointer.");
         return;
@@ -234,10 +271,11 @@ void delHist(void *item)
     free(h);
 }
 
-void historic_clear(Shell *sh)
+void historic_clear(void)
 {
-    clearList(sh->LH, delHist);
-    sh->command_count = 0;
+    if (!history) return;
+    clearList(history, delHist);
+    history_command_count = 0;
 }
 
 static void print_help_entry(const command_entry *e) {
@@ -258,9 +296,8 @@ static void print_all_help(void) {
     }
 }
 
-int cmd_help(int argc, char *argv[], Shell *sh)
+int cmd_help(int argc, char *argv[])
 {
-    (void)argc; (void)argv; (void)sh;
     // Sin parámetros imprime el help entero
     if (argc == 1) {
         print_all_help();
@@ -270,10 +307,15 @@ int cmd_help(int argc, char *argv[], Shell *sh)
     // Buscamos el comando en la tabla e imprimimos su help
     int status = 0;
     for (int i = 1; i < argc; ++i) {
-        command_entry *e = bsearch(&argv[i], commands, n_commands,
-                                    sizeof(commands[0]), command_cmp);
-        if (e) {
-            print_help_entry(e);
+        const command_entry *found = NULL;
+        for (size_t j = 0; j < n_commands; ++j) {
+            if (strcmp(argv[i], commands[j].name) == 0) {
+                found = &commands[j];
+                break;
+            }
+        }
+        if (found) {
+            print_help_entry(found);
         } else {
             fprintf(stderr, "help: commmand not found: %s\n", argv[i]);
             status = 1;

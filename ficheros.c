@@ -4,6 +4,34 @@
 #include "ficheros.h"
 #include "p2.h"
 
+static List *open_files = NULL;
+
+static void ensure_file_list(void) {
+    if (!open_files) open_files = createList();
+}
+
+static bool file_list_ready(void) {
+    if (!open_files) {
+        fprintf(stderr, "Internal error: file list not initialized\n");
+        return false;
+    }
+    return true;
+}
+
+void ficheros_init(void) {
+    ensure_file_list();
+    clearList(open_files, delFile);
+    insertItem(open_files, make_itemF(STDIN_FILENO,  "stdin",  O_RDONLY));
+    insertItem(open_files, make_itemF(STDOUT_FILENO, "stdout", O_WRONLY));
+    insertItem(open_files, make_itemF(STDERR_FILENO, "stderr", O_WRONLY));
+}
+
+void ficheros_shutdown(void) {
+    if (!open_files) return;
+    deleteList(open_files, delFile);
+    open_files = NULL;
+}
+
 static DirParams global_dir_params = { false, false, false, DIR_REC_NOREC };
 
 const DirParams *dirparams_get(void) { return &global_dir_params; }
@@ -149,10 +177,10 @@ static void take_flags(int flags, char *out, size_t n)
     #undef ADD
 }
 
-int cmd_listOpen(int argc, char *argv[], Shell *sh) {
-    (void)argc; (void)argv; (void)sh;
-    if (sh->LF->head == NULL) { printf("Empty list\n"); return 1; }
-    for (Node *n = sh->LF->head; n; n = n->next) {
+int cmd_listOpen(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    if (!open_files || open_files->head == NULL) { printf("Empty list\n"); return 1; }
+    for (Node *n = open_files->head; n; n = n->next) {
         tItemF *it = (tItemF*)n->data;
         char fl[128];
         take_flags(it->mode, fl, sizeof fl);
@@ -209,12 +237,10 @@ static void free_itemF(void *data) {
     free(data);
 }
 
-int cmd_open (int argc, char *argv[], Shell *sh)
+int cmd_open (int argc, char *argv[])
 {
-    (void)argc; (void)argv; (void)sh;
-    if (!sh || !sh->LF) { fprintf(stderr, "Internal error: file list not "
-                                            "initialized\n"); return 1; }
-    if (argc == 1) { return cmd_listOpen(argc, argv, sh); }
+    if (!file_list_ready()) return 1;
+    if (argc == 1) { return cmd_listOpen(argc, argv); }
     int flags = 0;
     for (int i = 2; argv[i] != NULL; ++i) {
         if      (!strcmp(argv[i], "cr")) flags |= O_CREAT;
@@ -229,7 +255,7 @@ int cmd_open (int argc, char *argv[], Shell *sh)
     int fd = open(argv[1], flags, 0666);
     if (fd == -1) { perror("open"); return 1; }
     tItemF *item = make_itemF(fd, argv[1], flags);
-    if (insertItem(sh->LF, item) != 0) {
+    if (insertItem(open_files, item) != 0) {
         perror("insertItem");
         close(fd);
         free(item);
@@ -239,13 +265,11 @@ int cmd_open (int argc, char *argv[], Shell *sh)
     return 0;
 }
 
-int cmd_close (int argc, char *argv[], Shell *sh){
-    (void)argc; (void)argv; (void)sh;
-    if (!sh || !sh->LF) { 
-        fprintf(stderr, "Internal error: file list not initialized\n");
+int cmd_close (int argc, char *argv[]){
+    if (!file_list_ready()) {
         return 1;
     }
-    if (argc == 1) { return cmd_listOpen(argc, argv, sh); }
+    if (argc == 1) { return cmd_listOpen(argc, argv); }
     char *endp = NULL;
     errno = 0;
     long lfd = strtol(argv[1], &endp, 10);
@@ -259,13 +283,13 @@ int cmd_close (int argc, char *argv[], Shell *sh){
             fprintf(stderr, "close: invalid fd '%s'\n", argv[1]);
             return 1;
         }
-        f = (tItemF*)findItem(sh->LF, &df, comparar_itemF_fd);
+        f = (tItemF*)findItem(open_files, &df, comparar_itemF_fd);
         if (!f) {
             fprintf(stderr, "close: fd %d not found in open list\n", df);
             return 1;
         }
     } else {
-        f = (tItemF*)findItem(sh->LF, argv[1], comparar_itemF_name);
+        f = (tItemF*)findItem(open_files, argv[1], comparar_itemF_name);
         if (!f) {
             fprintf(stderr, "close: file '%s' not found in open list\n",
                 argv[1]); return 1; }
@@ -278,21 +302,19 @@ int cmd_close (int argc, char *argv[], Shell *sh){
     if (closed_fd > 2)
         if (close(closed_fd) == -1) { perror("close"); return 1; }
     if (close_by_fd)
-        deleteItem(sh->LF, &df, comparar_itemF_fd, free_itemF);
-    else { deleteItem(sh->LF, argv[1], comparar_itemF_name, free_itemF); }
+        deleteItem(open_files, &df, comparar_itemF_fd, free_itemF);
+    else { deleteItem(open_files, argv[1], comparar_itemF_name, free_itemF); }
     printf("Closed [%d] %s\n", closed_fd, closed_name);
     return 0;
 }
 
-int cmd_dup(int argc, char *argv[], Shell *sh)
+int cmd_dup(int argc, char *argv[])
 {
-    (void)argc; (void)argv; (void)sh;
-    if (!sh || !sh->LF) { fprintf(stderr, "Internal error: file list not "
-                                            "initialized\n"); return 1; }
+    if (!file_list_ready()) { return 1; }
     if (argc == 1) { fprintf(stderr, "dup: missing fd\n"); return 1; }
     int df = atoi(argv[1]);
     if (df < 0) { fprintf(stderr, "dup: invalid fd '%s'\n", argv[1]); return 1;}
-    tItemF *f = (tItemF*)findItem(sh->LF, &df, comparar_itemF_fd);
+    tItemF *f = (tItemF*)findItem(open_files, &df, comparar_itemF_fd);
     if (!f) {
         fprintf(stderr, "dup: fd %d not found in open list\n", df);
         return 1;
@@ -300,7 +322,7 @@ int cmd_dup(int argc, char *argv[], Shell *sh)
     int duplicated = dup(df);
     if (duplicated == -1) { perror("dup"); return 1; }
     tItemF *newItem = make_itemF(duplicated, f->filename, f->mode);
-    if (insertItem(sh->LF, newItem) != 0) {
+    if (insertItem(open_files, newItem) != 0) {
         perror("insertItem");
         close(duplicated);
         free(newItem);
@@ -382,8 +404,7 @@ char * convertMode3 (mode_t m){
     return permisos;
 }
 
-int cmd_create(int argc, char *argv[], Shell *sh){
-    (void)sh;
+int cmd_create(int argc, char *argv[]){
     if (argc == 3 && strcmp(argv[1], "-f") == 0){
         const char* fileName = argv[2];
         const int df = open(fileName, O_CREAT | O_EXCL, S_IRWXU |
@@ -403,8 +424,8 @@ int cmd_create(int argc, char *argv[], Shell *sh){
     }else{ perror("Could not create file or directory"); return 1; }
 }
 
-int cmd_erase(int argc, char *argv[], Shell *sh){
-    (void)sh; struct stat sb;
+int cmd_erase(int argc, char *argv[]){
+    struct stat sb;
     if(argc > 1){
         for (int i = 1; i < argc; i++){
             if (lstat(argv[i], &sb) != 0) {
@@ -429,8 +450,7 @@ int cmd_erase(int argc, char *argv[], Shell *sh){
     }else{ perror("Invalid arguments for erase"); return 1; }
 }
 
-int cmd_setdirparams(int argc, char *argv[], Shell *sh){
-    (void)sh;
+int cmd_setdirparams(int argc, char *argv[]){
     if (argc < 2) {
         fprintf(stderr,
             "Usage: setdirparams long|short | link|nolink | hid|nohid | "
@@ -456,8 +476,8 @@ int cmd_setdirparams(int argc, char *argv[], Shell *sh){
     return 0;
 }
 
-int cmd_getdirparams(int argc, char *argv[], Shell *sh){
-    (void)argc; (void)argv; (void)sh;
+int cmd_getdirparams(int argc, char *argv[]){
+    (void)argc; (void)argv;
     printf("format   : %s\n", global_dir_params.longfmt ? "long" : "short");
     printf("symlink  : %s\n", global_dir_params.showlink ? "link" : "nolink");
     printf("hidden   : %s\n", global_dir_params.showhid ? "hid" : "nohid");
@@ -467,8 +487,8 @@ int cmd_getdirparams(int argc, char *argv[], Shell *sh){
     return 0;
 }
 
-int cmd_dir(int argc, char *argv[], Shell *sh){
-    (void)sh; int i = 1, status = 0; const DirParams *p = dirparams_get();
+int cmd_dir(int argc, char *argv[]){
+    int i = 1, status = 0; const DirParams *p = dirparams_get();
     bool list_contents = false; char *path; struct stat sb;
     if (i < argc && strcmp(argv[i], "-d") == 0) { list_contents = true; ++i; }
     if (argc <= 1) {
@@ -515,8 +535,7 @@ static int delrec_path(const char *path){
     return status;
 }
 
-int cmd_delrec(int argc, char *argv[], Shell *sh){
-    (void)sh;
+int cmd_delrec(int argc, char *argv[]){
     if (argc < 2) { fprintf(stderr, "Usage: delrec n1 [n2 ...]\n"); return 1; }
     int status = 0;
     for (int i = 1; i < argc; ++i) {
@@ -525,8 +544,7 @@ int cmd_delrec(int argc, char *argv[], Shell *sh){
     return status;
 }
 
-int cmd_lseek(int argc, char *argv[], Shell *sh){
-    (void)sh;
+int cmd_lseek(int argc, char *argv[]){
     if (argc != 4) {
         fprintf(stderr, "Usage: lseek df off SEEK_SET|SEEK_CUR|SEEK_END\n");
         return 1;
@@ -567,8 +585,7 @@ static int write_all(int fd, const char *buf, size_t len){
     return 0;
 }
 
-int cmd_writestr(int argc, char *argv[], Shell *sh){
-    (void)sh;
+int cmd_writestr(int argc, char *argv[]){
     if (argc < 3) { fprintf(stderr, "Usage: writestr df str\n"); return 1; }
     int fd = get_fd(argv);
     if (fd < 0) return 1;

@@ -27,8 +27,6 @@
 
 #include "lista.h"
 
-struct Shell;
-
 typedef struct tItemF{
 
     int fileDescriptor;
@@ -55,16 +53,19 @@ char *convertMode(mode_t m, char *permisos);
 char *convertMode2(mode_t m);
 char *convertMode3(mode_t m);
 
-int cmd_listOpen(int argc, char **argv, struct Shell *sh);
-int cmd_open(int argc, char **argv, struct Shell *sh);
-int cmd_close (int argc, char *argv[], struct Shell *sh);
-int cmd_dup (int argc, char **argv, struct Shell *sh);
-int cmd_create(int argc, char *argv[], struct Shell *sh);
-int cmd_erase(int argc, char *argv[], struct Shell *sh);
-int cmd_setdirparams(int argc, char *argv[], struct Shell *sh);
-int cmd_getdirparams(int argc, char *argv[], struct Shell *sh);
-int cmd_dir(int argc, char *argv[], struct Shell *sh);
-int cmd_delrec(int argc, char *argv[], struct Shell *sh);
-int cmd_lseek(int argc, char *argv[], struct Shell *sh);
-int cmd_writestr(int argc, char *argv[], struct Shell *sh);
+void ficheros_init(void);
+void ficheros_shutdown(void);
+
+int cmd_listOpen(int argc, char **argv);
+int cmd_open(int argc, char **argv);
+int cmd_close (int argc, char *argv[]);
+int cmd_dup (int argc, char **argv);
+int cmd_create(int argc, char *argv[]);
+int cmd_erase(int argc, char *argv[]);
+int cmd_setdirparams(int argc, char *argv[]);
+int cmd_getdirparams(int argc, char *argv[]);
+int cmd_dir(int argc, char *argv[]);
+int cmd_delrec(int argc, char *argv[]);
+int cmd_lseek(int argc, char *argv[]);
+int cmd_writestr(int argc, char *argv[]);
 #endif //FICHEROS_H

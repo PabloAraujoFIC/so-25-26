@@ -572,8 +572,7 @@ void *map_file(char *fichero, int protection) {
     return p;
 }
 
-int cmd_mmap(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_mmap(int argc, char *argv[]) {
     if (argc == 1) { show_mmap(); return 0; }
     if (strcmp(argv[1], "-free") == 0) {
         if (argc != 3) {
@@ -600,8 +599,7 @@ int cmd_mmap(int argc, char *argv[], struct Shell *sh) {
     return 0;
 }
 
-int cmd_shared(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_shared(int argc, char *argv[]) {
     if (argc == 1) { show_shared(); return 0; }
     if (strcmp(argv[1], "-create") == 0) {
         if (argc != 4) {
@@ -726,8 +724,7 @@ static int free_malloc_by_addr(void *addr) {
     return -1;
 }
 
-int cmd_malloc(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_malloc(int argc, char *argv[]) {
     if (argc == 1) { show_malloc(); return 0; }
     bool free_flag = false;
     const char *size_arg = NULL;
@@ -766,8 +763,7 @@ int cmd_malloc(int argc, char *argv[], struct Shell *sh) {
     return 0;
 }
 
-int cmd_free(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_free(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: free addr\n"); return 1;
     }
@@ -780,8 +776,7 @@ int cmd_free(int argc, char *argv[], struct Shell *sh) {
     return 1;
 }
 
-int cmd_memdump(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_memdump(int argc, char *argv[]) {
     if (argc != 3) { fprintf(stderr, "Usage: memdump addr count\n"); return 1; }
     void *addr = parse_pointer(argv[1]);
     if (!addr) { perror("parse_pointer"); return 1; }
@@ -856,8 +851,7 @@ void mem_cleanup(void) {
     clearList(get_malloc_list(), destroy_malloc_block);
 }
 
-int cmd_memfill(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_memfill(int argc, char *argv[]) {
     if (argc != 4) {
         fprintf(stderr, "Usage: memfill addr count byte\n"); return 1;
     }
@@ -881,8 +875,7 @@ int cmd_memfill(int argc, char *argv[], struct Shell *sh) {
     return 0;
 }
 
-int cmd_recurse(int argc, char *argv[], struct Shell *sh){
-    (void)sh;
+int cmd_recurse(int argc, char *argv[]){
     if (argc != 2) {
         fprintf(stderr, "Usage: recurse n\n"); return 1;
     }
@@ -932,8 +925,7 @@ static ssize_t read_file_chunk(char *f, void *p, size_t cont)
     return n;
 }
 
-int cmd_readfile(int argc, char *argv[], struct Shell *sh){
-    (void)sh;
+int cmd_readfile(int argc, char *argv[]){
     if (argc != 3 && argc != 4) {
         fprintf(stderr, "Usage: readfile file addr [count]\n"); return 1;
     }
@@ -951,8 +943,7 @@ int cmd_readfile(int argc, char *argv[], struct Shell *sh){
     return 0;
 }
 
-int cmd_read(int argc, char *argv[], struct Shell *sh){
-    (void)sh;
+int cmd_read(int argc, char *argv[]){
     if (argc != 4) {
         fprintf(stderr, "Usage: read fd addr count\n"); return 1;
     }
@@ -979,8 +970,7 @@ int cmd_read(int argc, char *argv[], struct Shell *sh){
     return 0;
 }
 
-int cmd_writefile(int argc, char *argv[], struct Shell *sh){
-    (void)sh;
+int cmd_writefile(int argc, char *argv[]){
     bool overwrite = false;
     const char *path = NULL;
     const char *addr_arg = NULL;
@@ -1021,8 +1011,7 @@ int cmd_writefile(int argc, char *argv[], struct Shell *sh){
     return 0;
 }
 
-int cmd_write(int argc, char *argv[], struct Shell *sh){
-    (void)sh;
+int cmd_write(int argc, char *argv[]){
     if (argc != 4) { fprintf(stderr, "Usage: write fd addr count\n"); return 1;}
     int fd = 0;
     if (read_fd(argv[1], &fd) != 0) {
@@ -1046,8 +1035,7 @@ int cmd_write(int argc, char *argv[], struct Shell *sh){
     return 0;
 }
 
-int cmd_mem(int argc, char *argv[], struct Shell *sh) {
-    (void)sh;
+int cmd_mem(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: mem [-funcs|-vars|-blocks|-all|-pmap]\n");
         return 1;
