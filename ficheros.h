@@ -26,6 +26,7 @@
 #include <stdlib.h>
 
 #include "lista.h"
+#include "p3.h"
 
 typedef struct tItemF{
 

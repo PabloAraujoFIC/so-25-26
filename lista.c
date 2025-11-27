@@ -1,10 +1,6 @@
 // Pablo Araújo Rodríguez   pablo.araujo@udc.es
 // Uriel Liñares Vaamonde   uriel.linaresv@udc.es
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
 #include "lista.h"
 
 // Crear lista

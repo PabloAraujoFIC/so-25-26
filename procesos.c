@@ -1,12 +1,6 @@
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "procesos.h"
-#include <signal.h>
-#include <stdbool.h>
-#include <sys/resource.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <ctype.h>
 
 static List *background_processes = NULL;
 
@@ -17,11 +11,15 @@ static void ensure_process_list(void) {
 }
 
 int cmd_fork(int argc, char *argv[]) {
-    (void)argc; (void)argv;
+    (void)argv;
+    if (argc != 1) {
+        fprintf(stderr, "Usage: fork\n");
+        return 1;
+    }
     pid_t pid;
     if ((pid = fork()) == 0){
         printf ("ejecutando proceso %d\n", getpid());
-        _exit(0);
+        exit(0); // Run atexit handlers to release allocations in the child
     } else if (pid > 0) {
         waitpid (pid,NULL,0);
         return 0;
@@ -225,6 +223,36 @@ static void build_command_line(char *dest, size_t cap,
         if (dest[0] != '\0') strncat(dest, " ", cap - strlen(dest) - 1);
         strncat(dest, argv[i], cap - strlen(dest) - 1);
     }
+}
+
+static bool command_exists_in_path(const char *cmd) {
+    if (!cmd || *cmd == '\0') return false;
+    if (strchr(cmd, '/')) {
+        return access(cmd, X_OK) == 0;
+    }
+    const char *path = getenv("PATH");
+    if (!path || *path == '\0') path = "/bin:/usr/bin";
+    char *mutable = strdup(path);
+    if (!mutable) {
+        perror("strdup");
+        return true; // Avoid false negatives on allocation failure.
+    }
+    bool found = false;
+    char *save = NULL;
+    for (char *dir = strtok_r(mutable, ":", &save); dir != NULL;
+        dir = strtok_r(NULL, ":", &save)) {
+        if (*dir == '\0') dir = ".";
+        char candidate[PATH_MAX];
+        if (snprintf(candidate, sizeof candidate, "%s/%s", dir, cmd)
+                        >= (int)sizeof candidate)
+            continue;
+        if (access(candidate, X_OK) == 0) {
+            found = true;
+            break;
+        }
+    }
+    free(mutable);
+    return found;
 }
 
 static int apply_priority_if_needed(const ExecSpec *spec) {
@@ -475,6 +503,10 @@ int execute_external_command(int argc, char *argv[]) {
     ExecSpec spec;
     if (parse_progspec_tokens(argc, argv, true, &spec) != 0) return 1;
     refresh_background_processes();
+    if (!command_exists_in_path(spec.argv[0])) {
+        fprintf(stderr, "%s: command not found\n", spec.argv[0]);
+        return 127;
+    }
     char command_line[MAX_COMMAND];
     build_command_line(command_line, sizeof command_line, argc, argv);
     pid_t pid = fork();

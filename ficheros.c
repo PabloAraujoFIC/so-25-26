@@ -2,7 +2,6 @@
 // Uriel Liñares Vaamonde   uriel.linaresv@udc.es
 
 #include "ficheros.h"
-#include "p2.h"
 
 static List *open_files = NULL;
 

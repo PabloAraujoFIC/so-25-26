@@ -18,8 +18,13 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <stdint.h>
+#include <sys/wait.h>
 
-#include "p2.h"
+#include "p3.h"
+#include "lista.h"
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif

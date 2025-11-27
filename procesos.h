@@ -9,8 +9,15 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <ctype.h>
+#include <limits.h>
 
-#include "p2.h"
+#include "p3.h"
 #include "memoria.h"
 #include "lista.h"
 #define MAXVAR 1024

@@ -5,12 +5,6 @@
 
 #include "memoria.h"
 
-#include "lista.h"
-
-#include <ctype.h>
-#include <stdint.h>
-#include <sys/wait.h>
-
 int ext_uninit_a;
 int ext_uninit_b;
 int ext_uninit_c;

@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "lista.h"
-#include "p2.h"
+#include "p3.h"
 #include "memoria.h"
 #include "ficheros.h"
 #include "procesos.h"
