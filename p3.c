@@ -14,6 +14,7 @@ static bool shell_should_exit = false;
 static char *command_buffer = NULL;
 static bool cleanup_done = false;
 static volatile sig_atomic_t sigint_received = 0;
+static List *env_owned_buffers = NULL;
 static void shell_cleanup(void);
 static void handle_sigint(int sig);
 
@@ -44,6 +45,10 @@ void shell_set_envp(char **envp) {
 static void shell_cleanup(void) {
     if (cleanup_done) return;
     cleanup_done = true;
+    if (env_owned_buffers) {
+        deleteList(env_owned_buffers, free);
+        env_owned_buffers = NULL;
+    }
     commands_shutdown();
     ficheros_shutdown();
     procesos_destroy();
@@ -285,6 +290,21 @@ static char **find_entry_in_env_array(char **env, const char *name) {
     return NULL;
 }
 
+static int cmp_env_ptr(void *data, void *key) {
+    return (data == key) ? 0 : 1;
+}
+
+static void track_env_buffer(char *buf) {
+    if (!buf) return;
+    if (!env_owned_buffers) env_owned_buffers = createList();
+    insertItem(env_owned_buffers, buf);
+}
+
+static void release_env_buffer_if_owned(char *buf) {
+    if (!env_owned_buffers || !buf) return;
+    deleteItem(env_owned_buffers, buf, cmp_env_ptr, free);
+}
+
 static int change_envvar_in_array(char **env, const char *varname, const
                                     char *newval, const char *who) {
     char **entry = find_entry_in_env_array(env, varname);
@@ -292,6 +312,7 @@ static int change_envvar_in_array(char **env, const char *varname, const
         fprintf(stderr, "Variable %s not found in %s, not creating it\n", varname, who);
         return -1;
     }
+    char *old = *entry;
     size_t len = strlen(varname) + 1 + strlen(newval) + 1;
     char *buf = malloc(len);
     if (!buf) {
@@ -299,10 +320,14 @@ static int change_envvar_in_array(char **env, const char *varname, const
     }
     snprintf(buf, len, "%s=%s", varname, newval);
     *entry = buf;
+    track_env_buffer(buf);
+    release_env_buffer_if_owned(old);
     return 0;
 }
 
 static int change_envvar_putenv(const char *varname, const char *newval) {
+    char **entry = find_entry_in_env_array(environ, varname);
+    char *old = entry ? *entry : NULL;
     size_t len = strlen(varname) + 1 + strlen(newval) + 1;
     char *buf = malloc(len);
     if (!buf) {
@@ -312,8 +337,11 @@ static int change_envvar_putenv(const char *varname, const char *newval) {
     snprintf(buf, len, "%s=%s", varname, newval);
     if (putenv(buf) != 0) {
         perror("putenv");
+        free(buf);
         return -1;
     }
+    track_env_buffer(buf);
+    release_env_buffer_if_owned(old);
     return 0;
 }
 

@@ -1,92 +1,221 @@
-# ---- Información básica ----
+# ==== Notas generales ====
+# Sustituye los marcadores por los valores mostrados por el programa:
+#   <PTR_M64>    direccion devuelta por 'malloc 64'
+#   <PTR_MMAP>   direccion devuelta por 'mmap base.txt rw'
+#   <PTR_SHARED> direccion devuelta por 'shared -create 5678 256'
+#   <PID_BG>     PID mostrado al lanzar un sleep en segundo plano
+#
+# Ejecuta las pruebas en orden para comprobar casos correctos y errores controlados.
+
+# ---- Informacion y ayuda ----
 authors
 authors -l
 authors -n
+authors -badflag
+help
+help dir historic envvar
+help comando_inexistente
+infosys
 date
-hour
 date -d
 date -t
-infosys
-help
-help authors dir historic
+hour
+date --badflag
 
-# ---- PID y directorio ----
+# ---- PID y rutas ----
 getpid
 getpid -p
 pid
 pid -p
-cwd
-getcwd
+pid --badflag
 pwd
+getcwd
+cwd
+cd .
 chdir .
+cd no_existe
+chdir no_existe
 cd ..
+cd /home/pablo/Documentos/Uni/SO/25-26/Practicas/Practicas
 cwd
 
 # ---- Pantalla ----
 cls
+cls extra
 
 # ---- Historial ----
+historic
 historic -count
+historic -3
+historic 0
 historic -clear
+historic
+authors
+date
+historic -2
 
-# ---- Creación y borrado de ficheros/dirs ----
-create tmpdir
-dir -d tmpdir
-chdir tmpdir
-create -f file.txt
-dir
+# ---- Entorno ----
+envvar
+envvar -show PATH
+envvar -change -p TESTVAR_PRUEBA valor_prueba
+envvar -show TESTVAR_PRUEBA
+envvar -change -a PATH /usr/bin:/bin
+envvar -change -e PATH /usr/bin:/bin
+envvar -show PATH
+envvar -change -p TESTVAR_PRUEBA ""
+envvar -foo
+showenv
+showenv -environ
+showenv -addr
+showenv -foo
+
+# ---- Parametros de dir ----
+getdirparams
+setdirparams long link hid reca
+getdirparams
+dir -d .
 setdirparams short nolink nohid norec
 getdirparams
-dir file.txt
-chdir ..
-erase tmpdir/file.txt
-dir -d tmpdir
-delrec tmpdir
+dir Makefile comandos.c
+dir -d no_existe
 
-# ---- Gestión de ficheros abiertos ----
-create -f testfile.txt
-open testfile.txt ro
+# ---- Preparacion de sandbox de ficheros ----
+delrec sandbox_fs
+create sandbox_fs
+dir -d sandbox_fs
+chdir sandbox_fs
+cwd
+create -f base.txt
+create datos
+create -f datos/oculto.tmp
+create -f base.txt
+dir
+dir -d datos
+erase datos/oculto.tmp
+erase no_existe.tmp
+dir datos
+
+# ---- Manejo de descriptores ----
 listopen
+open base.txt rw
 dup 3
 listopen
-close testfile.txt
+lseek 3 0 SEEK_CUR
+writestr 3 Texto_inicial_en_base
+lseek 3 0 SEEK_SET
+close 4
+open base.txt ro
+writestr 4 Intento_fallo_por_ro
+lseek 4 0 SEEK_SET
+lseek 1 0 SEEK_SET
+listopen
+close base.txt
+close 3
+close 99
+dup 99
+listopen
+open base.txt rw
 listopen
 
-# ---- Memoria ----
+# ---- Memoria y E/S ----
 mem -funcs
 mem -vars
 mem -blocks
 mem -all
-mem -pmap
+malloc 0
 malloc 64
-# Sustituye <PTR> por la dirección que muestre el malloc anterior:
-# memfill <PTR> 16 0x41
-# memdump <PTR> 16
-# free <PTR>
+malloc 128
+malloc 128 -free
+mem -blocks
+memfill <PTR_M64> 16 0x41
+memdump <PTR_M64> 32
+memdump 0x1 8
+writefile dump_from_mem.bin <PTR_M64> 16
+open dump_from_mem.bin ro
+readfile base.txt <PTR_M64>
+memdump <PTR_M64> 32
+read 4 <PTR_M64> 16
+write 4 <PTR_M64> 8
+writefile -o base_copy.bin <PTR_M64> 24
+readfile no_existe.txt <PTR_M64> 4
+close dump_from_mem.bin
+close 4
+close 3
+listopen
+free <PTR_M64>
+mem -blocks
 
-# ---- mmap / shared ----
-shared
-shared -create 12345 256
-shared
-shared -free 12345
-mmap sample.txt rw
+# ---- mmap y shared ----
+mmap base.txt rw
 mmap
-mmap -free sample.txt
+memdump <PTR_MMAP> 32
+mmap -free base.txt
+mmap -free no_map.txt
+free <PTR_MMAP>
+shared
+shared -delkey 5678
+shared -create 5678 256
+shared
+free <PTR_SHARED>
+shared 5678
+shared -free 5678
+shared -delkey 5678
+shared -create 5678 0
+
+# ---- Recursividad y mapa de memoria ----
+recurse 3
+mem -pmap
+
+# ---- Arboles de directorios ----
+create dir_rec
+create dir_rec/sub
+create -f dir_rec/sub/file.txt
+dir -d dir_rec
+delrec dir_rec
+
+# ---- Comandos externos (bash) ----
+/bin/echo externo_absoluto
+echo externo_path
+/bin/true
+/bin/false
+comando_inexistente
+@2 /bin/echo prioridad_positiva
+@-1 /bin/echo prioridad_negativa
+ls
+ls sandbox_fs
+ls &
+jobs
+deljobs -term
 
 # ---- Procesos ----
-fork
 jobs
 deljobs -term
-# Ejecuta una orden externa en segundo plano:
+fork
+@5 /bin/echo prioridad_en_foreground
 /bin/sleep 1 &
 jobs
+/bin/sleep 2
+jobs
 deljobs -term
+/bin/sleep 5 &
+jobs
+/bin/kill -TERM <PID_BG>
+jobs
+deljobs -sig
 
-# ---- Señales/UID ----
+# ---- Credenciales ----
 uid -get
+uid -set 0
+uid -set -l nobody
 
-# ---- Exec de programa externo (foreground) ----
-exec /bin/echo Exec_works
+# ---- Limpieza de sandbox ----
+chdir ..
+cwd
+dir -d sandbox_fs
+delrec sandbox_fs
 
-# ---- Salida ----
+# ---- Exec y salida (ejecutar individualmente al final) ----
+exec /bin/echo Exec_ok
+quit
+bye
 exit
