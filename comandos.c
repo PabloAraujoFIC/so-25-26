@@ -58,7 +58,7 @@ static command_entry commands[] = {
         "displays or updates environment variables"},
     {"erase", cmd_erase, "erase 'name':\tErases the empty files or directories "
         "specified by 'name'"},
-    {"exec", cmd_exec, "exec progspec: replaces the shell with the specified program (foreground only)"},
+    {"exec", cmd_exec, "exec progspec: executes the program in foreground (no background) and returns to the shell"},
     {"exit", cmd_exit, "Ends the shell"},
     {"fork", cmd_fork, "fork: creates a child process and waits for it to finish"},
     {"free", cmd_free, "free addr: releases the block associated with addr"},

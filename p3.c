@@ -310,6 +310,7 @@ static int change_envvar_in_array(char **env, const char *varname, const
     char **entry = find_entry_in_env_array(env, varname);
     if (!entry) {
         fprintf(stderr, "Variable %s not found in %s, not creating it\n", varname, who);
+        errno = ENOENT; // ensure caller reports the right error
         return -1;
     }
     char *old = *entry;

@@ -259,6 +259,10 @@ static int apply_priority_if_needed(const ExecSpec *spec) {
     if (!spec || !spec->has_priority) return 0;
     errno = 0;
     if (setpriority(PRIO_PROCESS, 0, spec->priority) == -1 && errno != 0) {
+        if (errno == EPERM || errno == EACCES) {
+            fprintf(stderr, "setpriority: Permission denied (continuing with current priority)\n");
+            return 0;
+        }
         perror("setpriority");
         return -1;
     }
@@ -400,6 +404,19 @@ static const char *signal_name(int sen) {
     return ("SIGUNKNOWN");
 }
 
+/* Parse a numeric uid safely; returns false on invalid input. */
+static bool parse_uid_value(const char *s, uid_t *out_uid) {
+    if (!s || *s == '\0') return false;
+    errno = 0;
+    char *end = NULL;
+    long val = strtol(s, &end, 10);
+    if (errno != 0 || *end != '\0' || val < 0) return false;
+    uid_t uid = (uid_t)val;
+    if ((long)uid != val) return false; // detect overflow
+    if (out_uid) *out_uid = uid;
+    return true;
+}
+
 int cmd_uid(int argc, char *argv[]){
     if (argc == 2 && strcmp(argv[1], "-get") == 0){
         uid_t ruid = getuid();
@@ -433,7 +450,11 @@ int cmd_uid(int argc, char *argv[]){
         return 0;
     }
     if (argc == 3 && strcmp(argv[1], "-set") == 0){
-        uid_t new_euid = (uid_t) atoi(argv[2]);
+        uid_t new_euid = 0;
+        if (!parse_uid_value(argv[2], &new_euid)) {
+            fprintf(stderr, "Invalid UID '%s'\n", argv[2]);
+            return 1;
+        }
         if (seteuid(new_euid) != 0) {
             perror("seteuid"); return 1;
         }
@@ -453,12 +474,32 @@ int cmd_exec(int argc, char *argv[]) {
     if (parse_progspec_tokens(argc - 1, &argv[1], false, &spec) != 0) {
         return 1;
     }
-    if (apply_priority_if_needed(&spec) != 0) {
+    if (!command_exists_in_path(spec.argv[0])) {
+        fprintf(stderr, "%s: command not found\n", spec.argv[0]);
+        return 127;
+    }
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
         return 1;
     }
-    execvp(spec.argv[0], spec.argv);
-    perror("execvp");
-    return 1;
+    if (pid == 0) {
+        if (apply_priority_if_needed(&spec) != 0) _exit(1);
+        execvp(spec.argv[0], spec.argv);
+        perror("execvp");
+        _exit(1);
+    }
+    int status;
+    if (waitpid(pid, &status, 0) == -1) {
+        perror("waitpid");
+        return 1;
+    }
+    if (WIFSIGNALED(status)) {
+        fprintf(stderr, "%s terminated by signal %s\n",
+                spec.argv[0], signal_name(WTERMSIG(status)));
+        return 1;
+    }
+    return WIFEXITED(status) ? WEXITSTATUS(status) : 0;
 }
 
 int cmd_jobs(int argc, char *argv[]) {
